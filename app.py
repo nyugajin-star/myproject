@@ -31,7 +31,7 @@ with col2:
 col2_1, col2_2 = st.columns((4, 1))
 
 with col2_1:
-    with st.expander('2차시_ 머신러닝의 개념 이해'):
+    with st.expander('2차시_ 국어의 개념 이해'):
         st.title('국어의 개념')
         st.markdown("""
         ### 📌 머신러닝 핵심 정리 (개조식)
