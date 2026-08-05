@@ -4,12 +4,12 @@ import os
 
 # 페이지 기본 설정
 st.set_page_config(
-    page_title="머신러닝 문제 해결 사례",
+    page_title="국어문법 문제 해결 사례",
     page_icon="💡",
     layout="wide"
 )
 
-st.title("💡 머신러닝 문제 해결 사례")
+st.title("💡 국어문법 문제 해결 사례")
 st.write("개발된 머신러닝 문제 해결 사례(aa.html)를 시각적으로 확인합니다.")
 st.write("---")
 
