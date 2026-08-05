@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>국어 문법 자동화 공장 - 비브라스 챌린지</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f0f4f8; }
+        
+        .machine-phoneme {
+            background: linear-gradient(135deg, #1d4ed8, #2563eb);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            color: white;
+            transition: all 0.2s ease;
+        }
+        .machine-manip {
+            background: linear-gradient(135deg, #d97706, #f59e0b);
+            border-radius: 9999px;
+            border: 3px solid #b45309;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            color: white;
+            transition: all 0.2s ease;
+        }
+        
+        .conveyor-belt {
+            height: 14px;
+            background: #334155;
+            border-radius: 7px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .conveyor-belt::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent,
+                transparent 20px,
+                #1e293b 20px,
+                #1e293b 40px
+            );
+            animation: moveBelt 1s linear infinite;
+        }
+        @keyframes moveBelt {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-40px); }
+        }
+
+        .word-card {
+            background-color: #fef08a;
+            color: #1e293b;
+            border: 2px solid #eab308;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .modal-overlay {
+            background-color: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(4px);
+        }
+
+        .heart-icon {
+            display: inline-block;
+            transition: transform 0.2s ease;
+        }
+        .heart-lost {
+            filter: grayscale(100%) opacity(0.3);
+        }
+
+        @keyframes pulse-light {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+        .pulse-card {
+            animation: pulse-light 1.5s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col justify-between">
+
+    <header class="bg-slate-900 text-white p-4 shadow-md sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto flex flex-wrap justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <span class="text-3xl">🏭</span>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-black tracking-tight text-yellow-400">국어 문법 자동화 공장</h1>
+                    <p class="text-xs text-slate-300">비브라스 챌린지: 컴퓨팅 사고력(CT) 융합 게임</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 sm:gap-3">
+                <button onclick="openRulebook()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg font-bold text-xs sm:text-sm transition-colors flex items-center gap-1 shadow">
+                    📖 기계 규칙서
+                </button>
+                <button onclick="openHintModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-900 px-3 py-2 rounded-lg font-extrabold text-xs sm:text-sm transition-colors flex items-center gap-1 shadow">
+                    💡 힌트 보기
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-5xl w-full mx-auto p-4 md:p-6 flex flex-col items-center">
+        
+        <div class="w-full flex flex-wrap justify-between items-center gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-100 text-indigo-800 px-3 py-1.5 rounded-lg font-black text-sm">
+                    STAGE <span id="level-num" class="text-xl text-indigo-700">1</span>/10
+                </div>
+                <div class="text-xs text-slate-500 font-bold hidden sm:block">
+                    글자 수: <span id="word-len-indicator" class="text-indigo-600 font-extrabold">2</span>글자 | 파이프: <span id="pipe-num-indicator" class="text-indigo-600 font-extrabold">1</span>개
+                </div>
+            </div>
+
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-1">
+                    <span class="text-xs font-bold text-slate-500 mr-1">남은 기회:</span>
+                    <span id="heart-1" class="heart-icon text-xl">❤️</span>
+                    <span id="heart-2" class="heart-icon text-xl">❤️</span>
+                    <span id="heart-3" class="heart-icon text-xl">❤️</span>
+                </div>
+                <div class="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 text-right">
+                    <span class="text-xs font-bold text-slate-400 block">현재 점수</span>
+                    <span id="current-score" class="text-lg font-black text-emerald-600">0</span> <span class="text-xs font-bold text-slate-500">점</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-full bg-white rounded-2xl shadow-lg border border-slate-200 p-4 sm:p-8 mb-6 relative overflow-hidden">
+            <div class="text-center mb-6">
+                <h2 class="text-base sm:text-lg font-bold text-slate-700">입력 카드가 파이프라인을 통과합니다. 최종 출력을 추론해 보세요!</h2>
+                <div class="flex flex-wrap justify-center gap-2 mt-2">
+                    <span class="inline-block bg-amber-50 text-amber-800 text-xs font-bold px-3 py-1 rounded-full border border-amber-200">
+                        ⚠️ 기계 조건에 맞지 않으면 형태 변화 없이 "그대로 통과(Bypass)"합니다!
+                    </span>
+                    <span class="inline-block bg-rose-50 text-rose-800 text-xs font-bold px-3 py-1 rounded-full border border-rose-200">
+                        🚫 주의: 연음 법칙도 이제 전용 기계(F)를 통과해야만 적용됩니다!
+                    </span>
+                </div>
+            </div>
+            
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
+                <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-3" id="pipeline-container">
+                    <!-- Pipeline elements dynamically inserted via JavaScript -->
+                </div>
+            </div>
+            
+            <div class="w-full conveyor-belt mb-6"></div>
+            
+            <div class="bg-slate-100 p-5 rounded-xl border border-slate-200 text-center max-w-xl mx-auto">
+                <label for="user-answer" class="block text-base font-bold text-slate-700 mb-2">최종 출력 단어 (주관식)</label>
+                <div class="flex flex-col sm:flex-row justify-center items-center gap-3">
+                    <input type="text" id="user-answer" placeholder="예: 궁물" class="text-center text-2xl font-black w-full sm:w-48 px-4 py-3 rounded-xl border-2 border-slate-300 focus:border-indigo-500 focus:bg-white focus:outline-none transition-all shadow-inner" autocomplete="off">
+                    <button onclick="checkAnswer()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-lg px-8 py-3 rounded-xl shadow-md transition-transform transform hover:scale-105 active:scale-95 shrink-0">
+                        ⚡ 작동 시작!
+                    </button>
+                </div>
+                <div id="input-feedback-msg" class="text-xs font-bold text-red-500 mt-2 min-h-[16px]"></div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="bg-slate-800 text-slate-400 py-4 text-center text-xs">
+        비브라스 챌린지 기반 국어 문법 컴퓨팅 사고력(CT) 인터랙티브 시뮬레이터
+    </footer>
+
+    <!-- Rulebook Modal -->
+    <div id="rulebook-modal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="bg-indigo-700 p-4 flex justify-between items-center text-white shrink-0">
+                <h3 class="text-lg font-bold flex items-center gap-2">📖 기계 작동 규칙서</h3>
+                <button onclick="closeRulebook()" class="text-white hover:text-indigo-200 text-2xl font-bold">&times;</button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-4 text-sm">
+                <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 font-bold text-center text-xs space-y-1">
+                    <p>🟢 핵심 원칙 1: 연음 법칙은 공장의 기본 원리입니다. 자음 뒤에 모음(ㅇ)이 오면 기계 없이도 자연스럽게 연음이 발생합니다.</p>
+                    <p>⚠️ 핵심 원칙 2: 단어가 기계의 조건과 맞지 않으면 "형태 변화 없이 그대로 통과(Bypass)"합니다.</p>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                        <h4 class="font-extrabold text-blue-900 text-base mb-2 flex items-center gap-2">
+                            <span class="inline-block w-3.5 h-3.5 bg-blue-600 rounded-sm"></span> 음운 변동 기계 6종 (직사각형)
+                        </h4>
+                        <ul class="space-y-2 text-xs text-slate-700">
+                            <li><strong class="text-blue-800">[기계 A] 비음화:</strong> 받침 [ㄱ,ㄷ,ㅂ] 뒤에 [ㄴ,ㅁ]이 오면 받침이 [ㅇ,ㄴ,ㅁ]으로 바뀜.</li>
+                            <li><strong class="text-blue-800">[기계 B] 유음화:</strong> [ㄴ]+[ㄹ] 또는 [ㄹ]+[ㄴ]이 만나면 [ㄹㄹ]로 바뀜.</li>
+                            <li><strong class="text-blue-800">[기계 C] 구개음화:</strong> 받침 [ㄷ,ㅌ] 뒤에 형식형태소 '이'가 오면 [ㅈ,ㅊ]으로 바뀜.</li>
+                            <li><strong class="text-blue-800">[기계 D] 끝소리 규칙:</strong> 대표음 외 받침을 대표음 [ㄱ,ㄷ,ㅂ]로 바꿈.</li>
+                            <li><strong class="text-blue-800">[기계 E] 자음군 단순화:</strong> 겹받침 중 하나만 남기고 탈락시킴.</li>
+                            <li><strong class="text-blue-800">[기계 F] 연음 법칙:</strong> 자음 받침 뒤에 모음(ㅇ)이 오면 받침을 뒷글자로 넘김.</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-amber-50 p-4 rounded-xl border border-amber-200">
+                        <h4 class="font-extrabold text-amber-900 text-base mb-2 flex items-center gap-2">
+                            <span class="inline-block w-3.5 h-3.5 bg-amber-600 rounded-full"></span> 텍스트 조작 기계 3종 (캡슐형)
+                        </h4>
+                        <ul class="space-y-2 text-xs text-slate-700">
+                            <li><strong class="text-amber-800">[기계 X] 위치 스왑:</strong> 단어의 <strong>첫 글자</strong>와 <strong>마지막 글자</strong>의 위치를 서로 교환함.</li>
+                            <li><strong class="text-amber-800">[기계 Y] 받침 교체:</strong> 첫 글자의 받침을 특정 받침(예: 'ㄷ', 'ㅁ')으로 강제 교체함.</li>
+                            <li><strong class="text-amber-800">[기계 Z] 모음 변환:</strong> 단어 안의 특정 모음(예: 'ㅡ', 'ㅜ')을 다른 모음으로 강제 변환함.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="p-3 bg-slate-100 text-right shrink-0">
+                <button onclick="closeRulebook()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-1.5 rounded-lg font-bold text-xs">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hint Modal -->
+    <div id="hint-modal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-amber-500 p-4 flex justify-between items-center text-slate-900">
+                <h3 class="text-lg font-black flex items-center gap-2">💡 단계별 추론 힌트</h3>
+                <button onclick="closeHintModal()" class="text-slate-900 hover:text-slate-700 text-2xl font-bold">&times;</button>
+            </div>
+            <div class="p-6">
+                <p class="text-xs text-slate-500 font-bold mb-3">※ 정답을 직접 알려주지 않고, 해결 방향을 안내합니다.</p>
+                <div id="hint-text" class="bg-amber-50 border border-amber-200 text-slate-800 p-4 rounded-xl text-sm font-semibold leading-relaxed">
+                </div>
+            </div>
+            <div class="p-4 bg-slate-100 text-right">
+                <button onclick="closeHintModal()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2 rounded-lg font-bold text-xs">이해했어요!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stage Result Modal (Correct or Incorrect Retry) -->
+    <div id="result-modal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col transform transition-all scale-95" id="result-content">
+            <div id="result-header" class="p-6 text-center text-white">
+                <h2 id="result-title" class="text-2xl sm:text-3xl font-black mb-1">정답입니다! 🎉</h2>
+                <p id="result-subtitle" class="text-sm opacity-90">파이프라인 추론에 성공했습니다.</p>
+            </div>
+            <div class="p-6 bg-slate-50 overflow-y-auto max-h-[50vh]">
+                <h3 id="trace-heading" class="font-bold text-slate-700 mb-3 text-sm">기계 통과 단계별 추적 (Trace)</h3>
+                <div id="trace-container" class="space-y-2 text-xs sm:text-sm font-medium text-slate-600">
+                </div>
+            </div>
+            <div class="p-4 bg-white border-t border-slate-200 flex justify-end gap-3 shrink-0">
+                <button id="btn-retry" onclick="retryStage()" class="hidden bg-amber-500 hover:bg-amber-600 text-slate-900 px-5 py-2.5 rounded-xl font-extrabold text-sm shadow">
+                    🔄 다시 시도하기 (남은 기회)
+                </button>
+                <button id="btn-next" onclick="nextLevel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
+                    다음 스테이지로 ➔
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Final Game Completion Modal -->
+    <div id="final-modal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div class="bg-slate-900 text-white p-6 text-center relative shrink-0">
+                <span class="text-4xl block mb-2">🏆</span>
+                <h2 class="text-2xl sm:text-3xl font-black text-yellow-400">국어 문법 자동화 공장 완료!</h2>
+                <p class="text-xs sm:text-sm text-slate-300 mt-1">컴퓨팅 사고력(CT) 역량 종합 평가 리포트</p>
+            </div>
+            
+            <div class="p-6 overflow-y-auto space-y-6">
+                <div class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6 rounded-2xl shadow-md flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
+                    <div>
+                        <span class="text-xs uppercase tracking-widest font-bold opacity-80 block">최종 합계 점수</span>
+                        <div class="text-4xl sm:text-5xl font-black text-yellow-300" id="final-score-val">00점</div>
+                        <p class="text-xs text-indigo-100 mt-1" id="final-attempts-summary">총 시도 횟수: 10회</p>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur-md px-6 py-4 rounded-xl border border-white/20 text-center">
+                        <span class="text-xs font-bold text-slate-200 block mb-1">최종 등급</span>
+                        <div class="text-3xl font-black text-white" id="final-rank-badge">S등급</div>
+                        <div class="text-xl mt-1" id="final-stars">⭐⭐⭐⭐⭐</div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                    <h3 class="font-extrabold text-slate-700 text-sm mb-4 flex items-center gap-2">
+                        📊 컴퓨팅 사고력(CT) 요소별 성취도
+                    </h3>
+                    <div class="space-y-3 text-xs font-bold">
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span>1. 패턴 인식 (음운 변동 및 연음 규칙 적용)</span>
+                                <span id="bar-phoneme-text" class="text-indigo-600">90%</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2.5">
+                                <div id="bar-phoneme" class="bg-indigo-600 h-2.5 rounded-full" style="width: 90%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span>2. 알고리즘 추론 (파이프라인 순차/스왑 연산)</span>
+                                <span id="bar-algo-text" class="text-blue-600">85%</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2.5">
+                                <div id="bar-algo" class="bg-blue-600 h-2.5 rounded-full" style="width: 85%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span>3. 예외 처리 (조건 불일치 시 Bypass 적용)</span>
+                                <span id="bar-bypass-text" class="text-emerald-600">95%</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2.5">
+                                <div id="bar-bypass" class="bg-emerald-600 h-2.5 rounded-full" style="width: 95%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
+                        <h4 class="font-extrabold text-emerald-800 text-sm mb-2 flex items-center gap-1.5">
+                            👏 잘한 점 (강점 피드백)
+                        </h4>
+                        <ul id="praise-list" class="text-xs text-emerald-900 space-y-1.5 list-disc pl-4 font-medium">
+                        </ul>
+                    </div>
+
+                    <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl">
+                        <h4 class="font-extrabold text-amber-800 text-sm mb-2 flex items-center gap-1.5">
+                            💡 보완할 점 (성장 피드백)
+                        </h4>
+                        <ul id="improvement-list" class="text-xs text-amber-900 space-y-1.5 list-disc pl-4 font-medium">
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-4 bg-slate-100 border-t border-slate-200 text-center shrink-0">
+                <button onclick="restartGame()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-extrabold text-base shadow-lg transition-transform hover:scale-105 active:scale-95">
+                    🔄 다시 처음부터 도전하기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Natural words & logic including Default 연음(Liaison) rule, Bypass logic, and Spoiler-free diagnostics.
+        const levels = [
+            {
+                level: 1,
+                input: "국물",
+                wordLen: 2,
+                machines: [
+                    { id: 'A', type: 'phoneme', name: '기계 A', desc: '비음화' }
+                ],
+                answer: "궁물",
+                hint: "비음화 기계 조건에 맞는지 확인하세요.",
+                diagnostics: [
+                    { step: 1, name: "기계 A (비음화)", isBypass: false, guide: "조건이 충족되어 받침에 비음화 규칙이 적용됩니다." }
+                ],
+                trace: [
+                    "입력 단어: [국물]",
+                    "1단계 (기계 A - 비음화): 받침 'ㄱ' 뒤에 'ㅁ'이 오므로 비음화 적용 ('ㄱ' &rarr; 'ㅇ') &rarr; <strong>[궁물]</strong>"
+                ]
+            },
+            {
+                level: 2,
+                input: "꽃이",
+                wordLen: 2,
+                machines: [
+                    { id: 'F', type: 'phoneme', name: '기계 F', desc: '연음 법칙' }
+                ],
+                answer: "꼬치",
+                hint: "기계 F를 통과하면 받침이 뒤로 넘어갑니다.",
+                diagnostics: [
+                    { step: 1, name: "기계 F (연음 법칙)", isBypass: false, guide: "자음 받침 뒤에 모음 '이'가 오므로 연음 법칙 조건이 충족됩니다." }
+                ],
+                trace: [
+                    "입력 단어: [꽃이]",
+                    "1단계 (기계 F - 연음 법칙): 받침 'ㅊ'이 뒤 빈 자리로 넘어가며 연음 적용 &rarr; <strong>[꼬치]</strong>"
+                ]
+            },
+            {
+                level: 3,
+                input: "물난리",
+                wordLen: 3,
+                machines: [
+                    { id: 'Z', type: 'manip', name: '기계 Z', desc: '모음 ㅡ를 ㅣ로' },
+                    { id: 'B', type: 'phoneme', name: '기계 B', desc: '유음화' }
+                ],
+                answer: "물랄리",
+                hint: "첫 번째 기계의 조건에 맞지 않으면 어떻게 되는지 떠올리세요. 두 번째 기계에서는 유음화가 일어납니다.",
+                diagnostics: [
+                    { step: 1, name: "기계 Z (모음 변환)", isBypass: true, guide: "단어에 해당 모음이 없으므로 형태 변화 없이 [그대로 통과(Bypass)]합니다." },
+                    { step: 2, name: "기계 B (유음화)", isBypass: false, guide: "조건이 충족되어 특정 자음이 주변 자음에 동화됩니다." }
+                ],
+                trace: [
+                    "입력 단어: [물난리]",
+                    "1단계 (기계 Z - 모음 변환): 모음 'ㅡ'가 없으므로 조건 불일치 &rarr; <span class='text-slate-400 font-bold'>그대로 통과(Bypass)</span> [물난리]",
+                    "2단계 (기계 B - 유음화): 'ㄴ'과 'ㄹ'이 만나 유음화 적용 ('ㄴ' &rarr; 'ㄹ') &rarr; <strong>[물랄리]</strong>"
+                ]
+            },
+            {
+                level: 4,
+                input: "밥먹는다",
+                wordLen: 4,
+                machines: [
+                    { id: 'D', type: 'phoneme', name: '기계 D', desc: '끝소리 규칙' },
+                    { id: 'A', type: 'phoneme', name: '기계 A', desc: '비음화' }
+                ],
+                answer: "밤멍는다",
+                hint: "단어의 모든 받침이 이미 대표음인지 확인하세요. 이후 2곳에서 동시에 일어나는 비음화를 놓치지 마세요.",
+                diagnostics: [
+                    { step: 1, name: "기계 D (끝소리 규칙)", isBypass: true, guide: "받침들이 이미 대표음이므로 변동 없이 [그대로 통과]합니다." },
+                    { step: 2, name: "기계 A (비음화)", isBypass: false, guide: "두 군데에서 비음화 조건이 충족되어 자음이 변화합니다." }
+                ],
+                trace: [
+                    "입력 단어: [밥먹는다]",
+                    "1단계 (기계 D - 끝소리 규칙): 받침이 이미 대표음이므로 &rarr; <span class='text-slate-400 font-bold'>그대로 통과(Bypass)</span> [밥먹는다]",
+                    "2단계 (기계 A - 비음화): 'ㅂ'이 'ㅁ'을 만나고, 'ㄱ'이 'ㄴ'을 만나 각각 비음화 적용 &rarr; <strong>[밤멍는다]</strong>"
+                ]
+            },
+            {
+                level: 5,
+                input: "막내",
+                wordLen: 2,
+                machines: [
+                    { id: 'Y', type: 'manip', name: '기계 Y', desc: '첫 글자 받침 ㄷ으로' },
+                    { id: 'A', type: 'phoneme', name: '기계 A', desc: '비음화' },
+                    { id: 'X', type: 'manip', name: '기계 X', desc: '첫-끝 글자 스왑' }
+                ],
+                answer: "내만",
+                hint: "받침이 먼저 강제로 교체된 후, 비음화 규칙이 적용됩니다. 마지막으로 단어의 양 끝 위치가 바뀝니다.",
+                diagnostics: [
+                    { step: 1, name: "기계 Y (받침 교체)", isBypass: false, guide: "첫 글자의 받침이 지정된 자음으로 강제 변경됩니다." },
+                    { step: 2, name: "기계 A (비음화)", isBypass: false, guide: "변경된 받침이 뒤 자음과 만나 비음화가 적용됩니다." },
+                    { step: 3, name: "기계 X (위치 스왑)", isBypass: false, guide: "완성된 단어의 첫 글자와 끝 글자의 자리가 서로 교환됩니다." }
+                ],
+                trace: [
+                    "입력 단어: [막내]",
+                    "1단계 (기계 Y - 받침 교체): 첫 글자 '막'의 받침을 'ㄷ'으로 교체 &rarr; [맏내]",
+                    "2단계 (기계 A - 비음화): '맏'의 받침 'ㄷ' 뒤에 'ㄴ'이 오므로 비음화 적용 ('ㄷ' &rarr; 'ㄴ') &rarr; [만내]",
+                    "3단계 (기계 X - 위치 스왑): 첫 글자와 끝 글자 위치 교환 &rarr; <strong>[내만]</strong>"
+                ]
+            },
+            {
+                level: 6,
+                input: "값어치",
+                wordLen: 3,
+                machines: [
+                    { id: 'E', type: 'phoneme', name: '기계 E', desc: '자음군 단순화' },
+                    { id: 'D', type: 'phoneme', name: '기계 D', desc: '끝소리 규칙' },
+                    { id: 'Y', type: 'manip', name: '기계 Y', desc: '첫 글자 받침 ㅁ으로' }
+                ],
+                answer: "감버치",
+                hint: "겹받침 하나가 탈락한 후, 모음 앞에서 일어나는 '기본 연음 법칙'을 꼭 적용하세요. 그 후 마지막 기계를 통과합니다.",
+                diagnostics: [
+                    { step: 1, name: "기계 E (자음군 단순화)", isBypass: false, guide: "겹받침에서 조건에 따라 자음 하나가 탈락합니다." },
+                    { step: "기본", name: "연음 법칙", isBypass: false, guide: "자음 뒤 빈 첫소리(ㅇ)로 자음이 넘어가 발음됩니다." },
+                    { step: 2, name: "기계 D (끝소리 규칙)", isBypass: true, guide: "대표음 변환 대상이 없으므로 [그대로 통과]합니다." },
+                    { step: 3, name: "기계 Y (받침 교체)", isBypass: false, guide: "첫 글자의 빈 받침 자리에 새로운 자음이 채워집니다." }
+                ],
+                trace: [
+                    "입력 단어: [값어치]",
+                    "1단계 (기계 E - 자음군 단순화): 겹받침 'ㅄ'에서 'ㅅ' 탈락 &rarr; [갑어치]",
+                    "기본 원칙 (연음 법칙): '갑'의 'ㅂ'이 뒤 음절로 연음됨 &rarr; [가버치]",
+                    "2단계 (기계 D - 끝소리 규칙): 조건 불일치로 &rarr; <span class='text-slate-400 font-bold'>그대로 통과(Bypass)</span> [가버치]",
+                    "3단계 (기계 Y - 받침 교체): 첫 글자 '가'에 받침 'ㅁ' 강제 추가 &rarr; <strong>[감버치]</strong>"
+                ]
+            },
+            {
+                level: 7,
+                input: "굳이말해",
+                wordLen: 4,
+                machines: [
+                    { id: 'Z', type: 'manip', name: '기계 Z', desc: '모음 ㅡ를 ㅣ로' },
+                    { id: 'C', type: 'phoneme', name: '기계 C', desc: '구개음화' },
+                    { id: 'Y', type: 'manip', name: '기계 Y', desc: '첫 글자 받침 ㄷ으로' },
+                    { id: 'X', type: 'manip', name: '기계 X', desc: '첫-끝 글자 스왑' }
+                ],
+                answer: "해지말굳",
+                hint: "조건 불일치 기계는 패스하고 구개음화를 적용하세요. 첫 글자 받침을 바꾼 후 마지막 스왑을 잊지 마세요.",
+                diagnostics: [
+                    { step: 1, name: "기계 Z (모음 변환)", isBypass: true, guide: "조건에 맞는 모음이 없으므로 [그대로 통과]합니다." },
+                    { step: 2, name: "기계 C (구개음화)", isBypass: false, guide: "조건이 충족되어 자음이 변화하고 자연스럽게 연음됩니다." },
+                    { step: 3, name: "기계 Y (받침 교체)", isBypass: false, guide: "첫 글자의 받침이 지정된 자음으로 강제 변경됩니다." },
+                    { step: 4, name: "기계 X (위치 스왑)", isBypass: false, guide: "단어의 첫 글자와 끝 글자의 자리가 서로 교환됩니다." }
+                ],
+                trace: [
+                    "입력 단어: [굳이말해]",
+                    "1단계 (기계 Z - 모음 변환): 모음 'ㅡ'가 없으므로 &rarr; <span class='text-slate-400 font-bold'>그대로 통과(Bypass)</span> [굳이말해]",
+                    "2단계 (기계 C - 구개음화 및 연음): '굳'의 ㄷ이 '이'를 만나 ㅈ으로 변하며 연음 &rarr; [구지말해]",
+                    "3단계 (기계 Y - 받침 교체): 첫 글자 '구'에 받침 'ㄷ' 강제 추가 &rarr; [굳지말해]",
+                    "4단계 (기계 X - 위치 스왑): 첫 글자와 끝 글자 위치 교환 &rarr; <strong>[해지말굳]</strong>"
+                ]
+            },
+            {
+                level: 8,
+                input: "부엌안쪽",
+                wordLen: 4,
+                machines: [
+                    { id: 'D', type: 'phoneme', name: '기계 D', desc: '끝소리 규칙' },
+                    { id: 'A', type: 'phoneme', name: '기계 A', desc: '비음화' },
+                    { id: 'Z', type: 'manip', name: '기계 Z', desc: '모음 ㅜ를 ㅗ로' },
+                    { id: 'X', type: 'manip', name: '기계 X', desc: '첫-끝 글자 스왑' }
+                ],
+                answer: "쪽어간보",
+                hint: "끝소리 규칙이 적용된 후, 뒤에 모음이 오므로 반드시 '기본 연음 법칙'을 실행해야 합니다. 조건을 꼼꼼히 살피세요.",
+                diagnostics: [
+                    { step: 1, name: "기계 D (끝소리 규칙)", isBypass: false, guide: "복잡한 받침이 대표음으로 단순화됩니다." },
+                    { step: "기본", name: "연음 법칙", isBypass: false, guide: "대표음으로 바뀐 자음이 뒤 빈 첫소리 자리로 넘어갑니다." },
+                    { step: 2, name: "기계 A (비음화)", isBypass: true, guide: "비음화 조건이 성립하지 않아 [그대로 통과]합니다." },
+                    { step: 3, name: "기계 Z (모음 변환)", isBypass: false, guide: "단어 내의 특정 모음이 모두 지정된 다른 모음으로 바뀝니다." },
+                    { step: 4, name: "기계 X (위치 스왑)", isBypass: false, guide: "단어의 맨 앞 글자와 맨 뒤 글자의 위치가 바뀝니다." }
+                ],
+                trace: [
+                    "입력 단어: [부엌안쪽]",
+                    "1단계 (기계 D - 끝소리 규칙): '부엌'의 ㅋ이 ㄱ으로 변경 &rarr; [부억안쪽]",
+                    "기본 원칙 (연음 법칙): '부억'의 ㄱ이 뒤 음절로 연음 &rarr; [부어간쪽]",
+                    "2단계 (기계 A - 비음화): 비음화 조건 불일치 &rarr; <span class='text-slate-400 font-bold'>그대로 통과(Bypass)</span> [부어간쪽]",
+                    "3단계 (기계 Z - 모음 변환): 'ㅜ' 모음이 'ㅗ'로 강제 변환 &rarr; [보어간쪽]",
+                    "4단계 (기계 X - 위치 스왑): 첫 글자와 끝 글자 교환 &rarr; <strong>[쪽어간보]</strong>"
+                ]
+            },
+            {
+                level: 9,
+                input: "닭이우는밤",
+                wordLen: 5,
+                machines: [
+                    { id: 'E', type: 'phoneme', name: '기계 E', desc: '자음군 단순화' },
+                    { id: 'D', type: 'phoneme', name: '기계 D', desc: '끝소리 규칙' },
+                    { id: 'Y', type: 'manip', name: '기계 Y', desc: '첫 글자 받침 ㅁ으로' },
+                    { id: 'A', type: 'phoneme', name: '기계 A', desc: '비음화' },
+                    { id: 'X', type: 'manip', name: '기계 X', desc: '첫-끝 글자 스왑' }
+                ],
+                answer: "밤기우는담",
+                hint: "5글자 장문입니다. 겹받침 탈락 후 기본 연음이 발생하며, 이후 조건이 맞지 않는 기계들은 바이패스 처리됩니다.",
+                diagnostics: [
+                    { step: 1, name: "기계 E (자음군 단순화)", isBypass: false, guide: "겹받침에서 규칙에 따라 자음이 탈락합니다." },
+                    { step: "기본", name: "연음 법칙", isBypass: false, guide: "남은 자음이 뒤 모음 자리로 자연스럽게 이동합니다." },
+                    { step: 2, name: "기계 D (끝소리 규칙)", isBypass: true, guide: "대표음 변환 대상이 없어 [그대로 통과]합니다." },
+                    { step: 3, name: "기계 Y (받침 교체)", isBypass: false, guide: "첫 글자에 빈 받침을 채워 강제 변환합니다." },
+                    { step: 4, name: "기계 A (비음화)", isBypass: true, guide: "비음화 조건 불일치로 [그대로 통과]합니다." },
+                    { step: 5, name: "기계 X (위치 스왑)", isBypass: false, guide: "마지막으로 첫-끝 위치가 교환됩니다." }
+                ],
+                trace: [
+                    "입력 단어: [닭이우는밤]",
+                    "1단계 (기계 E - 자음군 단순화): 겹받침 'ㄺ'에서 'ㄹ' 탈락 &rarr; [닥이우는밤]",
+                    "기본 원칙 (연음 법칙): '닥'의 ㄱ이 뒤로 연음 &rarr; [다기우는밤]",
+                    "2단계 (기계 D - 끝소리 규칙): 조건 불일치 &rarr; <span class='text-slate-400 font-bold'>그대로 통과(Bypass)</span> [다기우는밤]",
+                    "3단계 (기계 Y - 받침 교체): 첫 글자 '다'의 받침을 'ㅁ'으로 추가 &rarr; [담기우는밤]",
+                    "4단계 (기계 A - 비음화): 조건 불일치 &rarr; <span class='text-slate-400 font-bold'>그대로 통과(Bypass)</span> [담기우는밤]",
+                    "5단계 (기계 X - 위치 스왑): 첫 글자와 끝 글자 교환 &rarr; <strong>[밤기우는담]</strong>"
+                ]
+            },
+            {
+                level: 10,
+                input: "값없는상자",
+                wordLen: 5,
+                machines: [
+                    { id: 'E', type: 'phoneme', name: '기계 E', desc: '자음군 단순화' },
+                    { id: 'D', type: 'phoneme', name: '기계 D', desc: '끝소리 규칙' },
+                    { id: 'Y', type: 'manip', name: '기계 Y', desc: '첫 글자 받침 ㅁ으로' },
+                    { id: 'A', type: 'phoneme', name: '기계 A', desc: '비음화' },
+                    { id: 'X', type: 'manip', name: '기계 X', desc: '첫-끝 글자 스왑' }
+                ],
+                answer: "자범는상감",
+                hint: "최고 난이도입니다. 겹받침 2곳 단순화 후 '기본 연음' 적용, 받침 교체 후 다시 '비음화'를 차례대로 추적하세요.",
+                diagnostics: [
+                    { step: 1, name: "기계 E (자음군 단순화)", isBypass: false, guide: "단어 내 두 곳의 겹받침에서 각각 자음 하나가 탈락합니다." },
+                    { step: "기본", name: "연음 법칙", isBypass: false, guide: "첫 번째 단어 받침이 두 번째 단어 빈 첫소리로 넘어갑니다." },
+                    { step: 2, name: "기계 D (끝소리 규칙)", isBypass: true, guide: "모두 대표음이므로 [그대로 통과]합니다." },
+                    { step: 3, name: "기계 Y (받침 교체)", isBypass: false, guide: "첫 글자 빈 받침이 강제 지정됩니다." },
+                    { step: 4, name: "기계 A (비음화)", isBypass: false, guide: "특정 자음이 조건에 맞아 비음으로 동화됩니다." },
+                    { step: 5, name: "기계 X (위치 스왑)", isBypass: false, guide: "전체 파이프라인의 마지막 스왑 연산이 수행됩니다." }
+                ],
+                trace: [
+                    "입력 단어: [값없는상자]",
+                    "1단계 (기계 E - 자음군 단순화): 겹받침 'ㅄ', 'ㅄ'에서 각각 'ㅅ' 탈락 &rarr; [갑업는상자]",
+                    "기본 원칙 (연음 법칙): '갑'의 ㅂ이 '업'의 ㅇ 자리로 이동 &rarr; [가법는상자]",
+                    "2단계 (기계 D - 끝소리 규칙): 모두 대표음이므로 &rarr; <span class='text-slate-400 font-bold'>그대로 통과(Bypass)</span> [가법는상자]",
+                    "3단계 (기계 Y - 받침 교체): 첫 글자 '가'에 받침 'ㅁ' 강제 추가 &rarr; [감법는상자]",
+                    "4단계 (기계 A - 비음화): '법'의 ㅂ이 '는'의 ㄴ을 만나 ㅁ으로 변동 &rarr; [감범는상자]",
+                    "5단계 (기계 X - 위치 스왑): 첫 글자와 끝 글자 위치 교환 &rarr; <strong>[자범는상감]</strong>"
+                ]
+            }
+        ];
+
+        let currentLevelIdx = 0;
+        let stageAttempts = 3; 
+        let totalScore = 0;
+        let totalAttemptsUsed = 0;
+        let hintUsedCount = 0;
+        let stageScores = Array(10).fill(0);
+
+        function renderLevel() {
+            const level = levels[currentLevelIdx];
+            
+            document.getElementById('level-num').innerText = currentLevelIdx + 1;
+            document.getElementById('word-len-indicator').innerText = level.wordLen;
+            document.getElementById('pipe-num-indicator').innerText = level.machines.length;
+            document.getElementById('current-score').innerText = totalScore;
+            
+            document.getElementById('user-answer').value = '';
+            document.getElementById('input-feedback-msg').innerText = '';
+            
+            stageAttempts = 3;
+            updateHeartUI();
+
+            const container = document.getElementById('pipeline-container');
+            container.innerHTML = '';
+
+            const arrowHTML = `<div class="text-xl text-slate-400 font-black px-0.5 shrink-0">➔</div>`;
+
+            container.innerHTML += `
+                <div class="flex flex-col items-center mx-1 shrink-0">
+                    <span class="text-[10px] font-bold text-slate-400 mb-1">입력 카드 (${level.wordLen}글자)</span>
+                    <div class="word-card px-3 py-2 rounded-lg text-base sm:text-lg font-black tracking-wider pulse-card">${level.input}</div>
+                </div>
+                ${arrowHTML}
+            `;
+
+            level.machines.forEach((machine, idx) => {
+                const isManip = machine.type === 'manip';
+                const baseClass = isManip ? 'machine-manip px-3 py-2 text-center' : 'machine-phoneme px-3 py-2 text-center';
+                
+                container.innerHTML += `
+                    <div class="flex flex-col items-center shrink-0 my-1">
+                        <span class="text-[10px] font-bold text-slate-400 mb-1">${idx + 1}단계</span>
+                        <div class="${baseClass}">
+                            <div class="font-black text-xs sm:text-sm mb-0.5">${machine.name}</div>
+                            <div class="text-[10px] opacity-90">${machine.desc}</div>
+                        </div>
+                    </div>
+                `;
+
+                if (idx < level.machines.length - 1) {
+                    container.innerHTML += arrowHTML;
+                }
+            });
+
+            container.innerHTML += `
+                ${arrowHTML}
+                <div class="flex flex-col items-center mx-1 shrink-0">
+                    <span class="text-[10px] font-bold text-slate-400 mb-1">최종 출력</span>
+                    <div class="bg-slate-200 border-2 border-dashed border-slate-400 text-slate-500 px-3 py-2 rounded-lg text-base sm:text-lg font-black tracking-wider">
+                        [ ? ]
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateHeartUI() {
+            for (let i = 1; i <= 3; i++) {
+                const heartEl = document.getElementById(`heart-${i}`);
+                if (i <= stageAttempts) {
+                    heartEl.classList.remove('heart-lost');
+                } else {
+                    heartEl.classList.add('heart-lost');
+                }
+            }
+        }
+
+        function checkAnswer() {
+            const userAnswer = document.getElementById('user-answer').value.replace(/\s+/g, '');
+            const feedbackEl = document.getElementById('input-feedback-msg');
+            
+            if (!userAnswer) {
+                feedbackEl.innerText = '⚠️ 정답을 입력해 주세요!';
+                const input = document.getElementById('user-answer');
+                input.classList.add('border-red-500', 'bg-red-50');
+                setTimeout(() => input.classList.remove('border-red-500', 'bg-red-50'), 600);
+                return;
+            }
+
+            const level = levels[currentLevelIdx];
+            totalAttemptsUsed++;
+
+            if (userAnswer === level.answer) {
+                let pointsEarned = 10;
+                if (stageAttempts === 2) pointsEarned = 8;
+                if (stageAttempts === 1) pointsEarned = 5;
+
+                stageScores[currentLevelIdx] = pointsEarned;
+                totalScore += pointsEarned;
+                document.getElementById('current-score').innerText = totalScore;
+
+                showStageResultModal(true, level, pointsEarned);
+            } else {
+                stageAttempts--;
+                updateHeartUI();
+
+                if (stageAttempts > 0) {
+                    feedbackEl.innerText = `❌ 오답입니다! 기회가 ${stageAttempts}번 남았습니다. 다시 도전하세요.`;
+                    showStageResultModal(false, level, 0);
+                } else {
+                    stageScores[currentLevelIdx] = 0;
+                    showStageResultModal(false, level, 0, true);
+                }
+            }
+        }
+
+        function showStageResultModal(isCorrect, level, points, isFinalFailed = false) {
+            const modal = document.getElementById('result-modal');
+            const header = document.getElementById('result-header');
+            const title = document.getElementById('result-title');
+            const subtitle = document.getElementById('result-subtitle');
+            const btnRetry = document.getElementById('btn-retry');
+            const btnNext = document.getElementById('btn-next');
+            const traceHeading = document.getElementById('trace-heading');
+            const traceContainer = document.getElementById('trace-container');
+
+            modal.classList.remove('hidden');
+
+            if (isCorrect) {
+                header.className = 'p-6 text-center text-white bg-emerald-600';
+                title.innerText = '정답입니다! 🎉';
+                subtitle.innerText = `획득 점수: +${points}점 (추론 성공)`;
+                btnRetry.classList.add('hidden');
+                btnNext.classList.remove('hidden');
+                btnNext.innerText = (currentLevelIdx === levels.length - 1) ? '🏆 최종 결과 보기' : '다음 스테이지로 ➔';
+                
+                traceHeading.innerText = "기계 통과 단계별 추적 (Full Trace)";
+
+                let traceHTML = '';
+                level.trace.forEach((step, idx) => {
+                    traceHTML += `
+                        <div class="flex items-start gap-2.5 p-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                            <div class="bg-indigo-100 text-indigo-700 w-5 h-5 rounded-full flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">${idx + 1}</div>
+                            <div class="text-sm">${step}</div>
+                        </div>
+                    `;
+                });
+                traceContainer.innerHTML = traceHTML;
+
+            } else {
+                traceHeading.innerText = "🔍 어디서 틀렸을까? (스포일러 없는 진단 가이드)";
+                
+                if (isFinalFailed) {
+                    header.className = 'p-6 text-center text-white bg-rose-600';
+                    title.innerText = '기회를 모두 사용했습니다 😢';
+                    subtitle.innerText = '아래 가이드를 참고하여 잘못 추론한 부분을 확인하고 재도전하세요.';
+                    btnRetry.classList.remove('hidden');
+                    btnRetry.innerText = '🔄 스테이지 재도전';
+                    btnNext.classList.remove('hidden');
+                    btnNext.innerText = (currentLevelIdx === levels.length - 1) ? '🏆 최종 결과 보기' : '다음 스테이지로 ➔';
+                } else {
+                    header.className = 'p-6 text-center text-white bg-amber-500';
+                    title.innerText = '아쉬워요! 틀렸습니다 🤔';
+                    subtitle.innerText = `남은 기회: ${stageAttempts}회 | 다시 신중하게 파이프라인을 따라가보세요.`;
+                    btnRetry.classList.remove('hidden');
+                    btnRetry.innerText = '🔄 다시 입력하기';
+                    btnNext.classList.add('hidden');
+                }
+
+                let diagHTML = '';
+                level.diagnostics.forEach((diag) => {
+                    let badgeClass = 'bg-blue-100 text-blue-800 border-blue-300';
+                    let badgeText = '⚡ 변환 작동';
+                    
+                    if(diag.isBypass) {
+                        badgeClass = 'bg-slate-100 text-slate-700 border-slate-300';
+                        badgeText = '⚠️ Bypass (통과)';
+                    }
+                    if(diag.step === '기본') {
+                        badgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+                        badgeText = '🟢 자동 적용';
+                    }
+
+                    diagHTML += `
+                        <div class="p-3 bg-white rounded-lg border border-slate-200 shadow-sm space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-800 text-sm">${diag.step}단계: ${diag.name}</span>
+                                <span class="text-[10px] font-extrabold px-2 py-0.5 rounded border ${badgeClass}">${badgeText}</span>
+                            </div>
+                            <p class="text-xs text-slate-600 font-medium leading-relaxed">${diag.guide}</p>
+                        </div>
+                    `;
+                });
+                traceContainer.innerHTML = diagHTML;
+            }
+        }
+
+        function retryStage() {
+            document.getElementById('result-modal').classList.add('hidden');
+            if (stageAttempts <= 0) {
+                stageAttempts = 3;
+                updateHeartUI();
+            }
+            document.getElementById('user-answer').value = '';
+            document.getElementById('user-answer').focus();
+        }
+
+        function nextLevel() {
+            document.getElementById('result-modal').classList.add('hidden');
+            if (currentLevelIdx < levels.length - 1) {
+                currentLevelIdx++;
+                renderLevel();
+            } else {
+                showFinalDashboard();
+            }
+        }
+
+        function showFinalDashboard() {
+            const finalModal = document.getElementById('final-modal');
+            finalModal.classList.remove('hidden');
+
+            document.getElementById('final-score-val').innerText = `${totalScore}점`;
+            document.getElementById('final-attempts-summary').innerText = `10개 스테이지 완료 | 총 시도: ${totalAttemptsUsed}회 | 힌트 사용: ${hintUsedCount}회`;
+
+            let rank = 'A등급';
+            let stars = '⭐⭐⭐⭐';
+            if (totalScore >= 90) { rank = 'S등급 (마스터)'; stars = '⭐⭐⭐⭐⭐'; }
+            else if (totalScore >= 75) { rank = 'A등급 (우수)'; stars = '⭐⭐⭐⭐'; }
+            else if (totalScore >= 55) { rank = 'B등급 (보통)'; stars = '⭐⭐⭐'; }
+            else { rank = 'C등급 (노력요함)'; stars = '⭐⭐'; }
+
+            document.getElementById('final-rank-badge').innerText = rank;
+            document.getElementById('final-stars').innerText = stars;
+
+            const phonemePct = Math.min(100, Math.round((totalScore / 100) * 100));
+            const algoPct = Math.max(40, Math.min(100, Math.round(100 - (totalAttemptsUsed - 10) * 5)));
+            const bypassPct = Math.min(100, Math.round(phonemePct * 0.95 + 5));
+
+            document.getElementById('bar-phoneme').style.width = `${phonemePct}%`;
+            document.getElementById('bar-phoneme-text').innerText = `${phonemePct}%`;
+            
+            document.getElementById('bar-algo').style.width = `${algoPct}%`;
+            document.getElementById('bar-algo-text').innerText = `${algoPct}%`;
+
+            document.getElementById('bar-bypass').style.width = `${bypassPct}%`;
+            document.getElementById('bar-bypass-text').innerText = `${bypassPct}%`;
+
+            const praiseList = document.getElementById('praise-list');
+            praiseList.innerHTML = '';
+            praiseList.innerHTML += `<li>비음화, 유음화 등 기본 규칙뿐 아니라 <strong>연음 법칙</strong>의 자연스러운 원리를 잘 이해했습니다.</li>`;
+            praiseList.innerHTML += `<li>최대 5개의 기계가 결합된 복잡한 파이프라인에서 순차적 알고리즘 흐름을 정확히 쫓아갔습니다.</li>`;
+            if (hintUsedCount <= 3) {
+                praiseList.innerHTML += `<li>힌트에 크게 의존하지 않고 주관식 결과값을 스스로 추론하는 문제 해결력이 뛰어납니다.</li>`;
+            } else {
+                praiseList.innerHTML += `<li>힌트를 활용하며 포기하지 않고 10개의 스테이지를 끝까지 완주해낸 끈기가 훌륭합니다.</li>`;
+            }
+
+            const impList = document.getElementById('improvement-list');
+            impList.innerHTML = '';
+            if (totalAttemptsUsed > 12) {
+                impList.innerHTML += `<li>기계의 작동 조건에 맞지 않을 때 <strong>형태 변화 없이 그대로 통과(Bypass)</strong>하는 조건문 예외 처리 상황을 더 신중히 확인하세요.</li>`;
+            }
+            impList.innerHTML += `<li>마지막 단계에 등장하는 [위치 스왑 기계 X]는 항상 이전까지 누적 변환된 단어의 첫-끝 위치를 뒤바꾼다는 점을 유의하세요.</li>`;
+            impList.innerHTML += `<li>4~5글자의 긴 단어는 중간 단계의 연음이나 변동을 메모하며 추론하면 오답률을 크게 낮출 수 있습니다.</li>`;
+        }
+
+        function restartGame() {
+            currentLevelIdx = 0;
+            totalScore = 0;
+            totalAttemptsUsed = 0;
+            hintUsedCount = 0;
+            stageScores = Array(10).fill(0);
+            document.getElementById('final-modal').classList.add('hidden');
+            renderLevel();
+        }
+
+        function openRulebook() {
+            document.getElementById('rulebook-modal').classList.remove('hidden');
+        }
+        function closeRulebook() {
+            document.getElementById('rulebook-modal').classList.add('hidden');
+        }
+
+        function openHintModal() {
+            const level = levels[currentLevelIdx];
+            document.getElementById('hint-text').innerText = level.hint;
+            document.getElementById('hint-modal').classList.remove('hidden');
+            hintUsedCount++;
+        }
+        function closeHintModal() {
+            document.getElementById('hint-modal').classList.add('hidden');
+        }
+
+        window.onload = function() {
+            renderLevel();
+            document.getElementById('user-answer').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    checkAnswer();
+                }
+            });
+        };
+    </script>
+</body>
+</html>

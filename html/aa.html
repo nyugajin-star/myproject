@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>비브라스 챌린지: 확산의 길 찾기 (랜덤 셔플)</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --bg-color: #f5f7fa;
+            --grid-bg: #ffffff;
+            --obstacle-color: #2d3436;
+            --text-main: #2c3e50;
+            --border-color: #e1e8ed;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            background-color: var(--grid-bg);
+            max-width: 600px;
+            width: 100%;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            padding: 30px;
+            box-sizing: border-box;
+            position: relative;
+            z-index: 10;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            margin: 0 0 15px 0;
+            color: var(--primary-color);
+        }
+
+        /* 점수 및 시도 횟수 보드 */
+        .score-board {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            border: 1px solid #ffeeba;
+        }
+
+        .score-board span.highlight {
+            color: var(--danger-color);
+            font-size: 1.2rem;
+        }
+        .score-board span.success {
+            color: var(--success-color);
+            font-size: 1.2rem;
+        }
+
+        .problem-desc {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid var(--primary-color);
+            margin-bottom: 20px;
+        }
+
+        /* Grid System */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 4px;
+            margin-bottom: 20px;
+            background-color: var(--border-color);
+            padding: 4px;
+            border-radius: 10px;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            background-color: white;
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .cell.obstacle { background-color: var(--obstacle-color); }
+        .cell.start { background-color: #e3f2fd; }
+        .cell.end { background-color: #e8f5e9; }
+
+        .player {
+            position: absolute;
+            font-size: 1.8rem;
+            z-index: 10;
+            animation: bounce 1s infinite alternate;
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-4px); }
+        }
+
+        /* Status & Controls */
+        .status-board {
+            display: flex;
+            justify-content: space-between;
+            background-color: #f1f3f5;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .path-display {
+            letter-spacing: 2px;
+            color: var(--primary-color);
+            word-break: break-all;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 200px;
+            margin: 0 auto 20px auto;
+        }
+
+        .controls button {
+            padding: 15px;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 10px;
+            background-color: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.2s;
+            touch-action: manipulation;
+        }
+
+        .controls button:active { transform: scale(0.95); }
+        .controls button:hover { background-color: #357abd; }
+        
+        .btn-up { grid-column: 2; }
+        .btn-left { grid-column: 1; }
+        .btn-down { grid-column: 2; }
+        .btn-right { grid-column: 3; }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .action-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-grow: 1;
+            max-width: 140px;
+        }
+
+        .btn-submit { background-color: var(--success-color); color: white; font-size: 1.05rem; }
+        .btn-submit:hover { background-color: #27ae60; }
+        .btn-reset { background-color: #e0e0e0; color: #333; }
+        .btn-hint { background-color: #ffca28; color: #333; }
+        .btn-answer { background-color: var(--danger-color); color: white; }
+
+        .action-btn:hover { opacity: 0.8; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 400px;
+            width: 80%;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .modal h2 { margin-top: 0; }
+        .modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* ----- 애니메이션 효과 CSS ----- */
+        .effect-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 9999;
+            overflow: hidden;
+        }
+
+        .plus-one {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 50pt;
+            font-weight: 900;
+            color: #2ecc71;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            animation: fallDownPlus 2s forwards ease-in;
+        }
+        @keyframes fallDownPlus {
+            0% { top: -100px; opacity: 1; transform: translateX(-50%) scale(1); }
+            100% { top: 100vh; opacity: 0.8; transform: translateX(-50%) scale(1.2); }
+        }
+
+        .particle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: explode 1s forwards ease-out;
+        }
+        @keyframes explode {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+        }
+
+        .minus-one {
+            position: absolute;
+            top: -100px;
+            font-size: 30pt;
+            font-weight: 900;
+            color: #e74c3c;
+            opacity: 0.8;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            animation: rainFall linear forwards;
+        }
+        @keyframes rainFall {
+            0% { top: -100px; transform: translateY(0); }
+            100% { top: 100vh; transform: translateY(0); }
+        }
+
+        @media (max-width: 480px) {
+            .container { padding: 15px; }
+            .cell { font-size: 1.2rem; }
+            .player { font-size: 1.5rem; }
+            .status-board { flex-direction: column; gap: 10px; text-align: center; }
+            .score-board { flex-direction: column; gap: 5px; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>비브라스 챌린지: 확산의 길 찾기</h1>
+        </div>
+
+        <div class="score-board">
+            <div>도전 횟수: <span id="attemptCount" class="highlight">0</span> 회</div>
+            <div>현재 점수: <span id="totalScore" class="success">0</span> 점</div>
+        </div>
+
+        <div class="problem-desc">
+            <strong>문제 1.</strong> 수아의 방 한구석에 놓인 향수병에서 향기 분자가 확산됩니다.<br><br>
+            방향키나 화살표 버튼을 이용해 <strong>도착지(🎯)까지 가장 짧은 경로(최소 시간)</strong>로 이동한 후, <strong>[정답 제출]</strong>을 눌러주세요.
+        </div>
+
+        <div class="grid-container" id="grid">
+            <!-- Grid will be generated by JS -->
+        </div>
+
+        <div class="status-board">
+            <div>나의 경로: <span id="path" class="path-display"></span></div>
+            <div>이동 시간: <span id="time" class="path-display">0</span> 초</div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-up" onclick="move(0, -1, '↑')">↑</button>
+            <button class="btn-left" onclick="move(-1, 0, '←')">←</button>
+            <button class="btn-down" onclick="move(0, 1, '↓')">↓</button>
+            <button class="btn-right" onclick="move(1, 0, '→')">→</button>
+        </div>
+
+        <div class="action-buttons">
+            <button class="action-btn btn-submit" onclick="submitAnswer()">정답 제출</button>
+            <button class="action-btn btn-hint" onclick="showModal('hint')">힌트</button>
+            <button class="action-btn btn-answer" onclick="showModal('answer')">정답 보기</button>
+            <button class="action-btn btn-reset" onclick="hardResetGame()">게임 다시하기</button>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h2 id="modalTitle">알림</h2>
+            <div id="modalContent">내용</div>
+            <button onclick="closeModalAndShuffle()">확인</button>
+        </div>
+    </div>
+
+    <script>
+        let mapData = [];
+        let currentX = 0, currentY = 0;
+        let startX = 0, startY = 0;
+        let endX = 5, endY = 4;
+        let pathHistory = [];
+        let shortestPathData = { length: 0, path: [] };
+        let isGameActive = true;
+
+        let attempts = 0;
+        let score = 0;
+
+        const gridElement = document.getElementById('grid');
+        const pathElement = document.getElementById('path');
+        const timeElement = document.getElementById('time');
+        const attemptElement = document.getElementById('attemptCount');
+        const scoreElement = document.getElementById('totalScore');
+
+        // 알고리즘: 시작 좌표(sx, sy)를 받아서 최단 거리를 계산
+        function calculateShortestPath(map, sx, sy) {
+            let queue = [{x: sx, y: sy, dist: 0, path: []}];
+            let visited = Array(5).fill().map(() => Array(6).fill(false));
+            visited[sy][sx] = true;
+            
+            let dirs = [{dx: 0, dy: -1, a: '↑'}, {dx: 1, dy: 0, a: '→'}, {dx: 0, dy: 1, a: '↓'}, {dx: -1, dy: 0, a: '←'}];
+            
+            while(queue.length > 0) {
+                let curr = queue.shift();
+                if (map[curr.y][curr.x] === 3) return { length: curr.dist, path: curr.path };
+                
+                for (let d of dirs) {
+                    let nx = curr.x + d.dx;
+                    let ny = curr.y + d.dy;
+                    if (nx >= 0 && nx < 6 && ny >= 0 && ny < 5 && !visited[ny][nx] && map[ny][nx] !== 1) {
+                        visited[ny][nx] = true;
+                        queue.push({x: nx, y: ny, dist: curr.dist + 1, path: [...curr.path, d.a]});
+                    }
+                }
+            }
+            return { length: -1, path: [] }; 
+        }
+
+        function generateRandomMap() {
+            let valid = false;
+            while (!valid) {
+                mapData = Array(5).fill().map(() => Array(6).fill(0));
+                
+                // 시작점 랜덤 지정
+                startX = Math.floor(Math.random() * 6);
+                startY = Math.floor(Math.random() * 5);
+                mapData[startY][startX] = 2; 
+
+                // 도착점 랜덤 지정 (시작점과 겹치지 않게)
+                do {
+                    endX = Math.floor(Math.random() * 6);
+                    endY = Math.floor(Math.random() * 5);
+                } while(endX === startX && endY === startY);
+                mapData[endY][endX] = 3; 
+
+                // 장애물 7개 랜덤 배치
+                let obstacles = 0;
+                while (obstacles < 7) {
+                    let rx = Math.floor(Math.random() * 6);
+                    let ry = Math.floor(Math.random() * 5);
+                    if (mapData[ry][rx] === 0) {
+                        mapData[ry][rx] = 1;
+                        obstacles++;
+                    }
+                }
+
+                // 만든 맵이 도착 가능한지 검증
+                let result = calculateShortestPath(mapData, startX, startY);
+                if (result.length !== -1) {
+                    shortestPathData = result;
+                    valid = true;
+                }
+            }
+        }
+
+        function initGrid() {
+            gridElement.innerHTML = '';
+            for (let y = 0; y < 5; y++) {
+                for (let x = 0; x < 6; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    
+                    if (mapData[y][x] === 1) cell.classList.add('obstacle');
+                    else if (mapData[y][x] === 2) {
+                        cell.classList.add('start');
+                        cell.innerHTML = '<span style="font-size:0.8rem; color:#666;">시작</span>';
+                    }
+                    else if (mapData[y][x] === 3) {
+                        cell.classList.add('end');
+                        cell.innerHTML = '🎯';
+                    }
+
+                    if (x === currentX && y === currentY) {
+                        const player = document.createElement('div');
+                        player.className = 'player';
+                        player.innerText = '💨';
+                        cell.appendChild(player);
+                    }
+                    gridElement.appendChild(cell);
+                }
+            }
+        }
+
+        function move(dx, dy, arrow) {
+            if (!isGameActive) return;
+
+            const newX = currentX + dx;
+            const newY = currentY + dy;
+
+            if (newX < 0 || newX >= 6 || newY < 0 || newY >= 5) return;
+            if (mapData[newY][newX] === 1) return; 
+
+            currentX = newX;
+            currentY = newY;
+            pathHistory.push(arrow);
+            
+            pathElement.innerText = pathHistory.join(' ');
+            timeElement.innerText = pathHistory.length;
+            initGrid();
+        }
+
+        function createBurst(container, leftPercent, topPercent) {
+            for(let i=0; i<40; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = leftPercent + '%';
+                particle.style.top = topPercent + '%';
+                
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = 50 + Math.random() * 150;
+                const tx = Math.cos(angle) * velocity;
+                const ty = Math.sin(angle) * velocity;
+                
+                particle.style.setProperty('--tx', `${tx}px`);
+                particle.style.setProperty('--ty', `${ty}px`);
+                
+                const colors = ['#f1c40f', '#e74c3c', '#3498db', '#2ecc71', '#9b59b6'];
+                particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                
+                container.appendChild(particle);
+            }
+        }
+
+        function createSuccessEffect() {
+            const container = document.createElement('div');
+            container.className = 'effect-container';
+            document.body.appendChild(container);
+
+            const plusOne = document.createElement('div');
+            plusOne.innerText = '+1';
+            plusOne.className = 'plus-one';
+            container.appendChild(plusOne);
+
+            createBurst(container, 50, 30);
+            setTimeout(() => createBurst(container, 30, 50), 300);
+            setTimeout(() => createBurst(container, 70, 40), 600);
+            setTimeout(() => createBurst(container, 50, 60), 900);
+
+            setTimeout(() => container.remove(), 3000);
+        }
+
+        function createRainEffect() {
+            const container = document.createElement('div');
+            container.className = 'effect-container';
+            document.body.appendChild(container);
+
+            for(let i=0; i<60; i++) {
+                const minusOne = document.createElement('div');
+                minusOne.innerText = '-1';
+                minusOne.className = 'minus-one';
+                
+                minusOne.style.left = `${Math.random() * 100}vw`;
+                minusOne.style.animationDuration = `${1 + Math.random() * 1.5}s`;
+                minusOne.style.animationDelay = `${Math.random() * 0.5}s`;
+                
+                container.appendChild(minusOne);
+            }
+
+            setTimeout(() => container.remove(), 3000);
+        }
+
+        function submitAnswer() {
+            if (!isGameActive) return;
+            
+            attempts++;
+            attemptElement.innerText = attempts;
+
+            // 랜덤 배치된 endX, endY와 현재 위치 비교
+            const isAtEnd = (currentX === endX && currentY === endY);
+            const isShortest = (pathHistory.length === shortestPathData.length);
+            
+            isGameActive = false;
+
+            if (isAtEnd && isShortest) {
+                score++;
+                createSuccessEffect(); 
+                setTimeout(() => showModal('success'), 1500);
+            } else if (isAtEnd && !isShortest) {
+                score--;
+                createRainEffect(); 
+                setTimeout(() => showModal('wrong_path'), 1500);
+            } else {
+                score--;
+                createRainEffect(); 
+                setTimeout(() => showModal('wrong_dest'), 1500);
+            }
+
+            scoreElement.innerText = score;
+            scoreElement.className = score >= 0 ? 'success' : 'highlight';
+        }
+
+        function shuffleAndRestart() {
+            generateRandomMap();
+            // 랜덤으로 지정된 시작 위치에서 캐릭터 시작
+            currentX = startX;
+            currentY = startY;
+            pathHistory = [];
+            pathElement.innerText = '';
+            timeElement.innerText = '0';
+            isGameActive = true;
+            initGrid();
+        }
+
+        function hardResetGame() {
+            attempts = 0;
+            score = 0;
+            attemptElement.innerText = attempts;
+            scoreElement.innerText = score;
+            scoreElement.className = 'success';
+            shuffleAndRestart();
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if(!isGameActive) return;
+            switch(e.key) {
+                case 'ArrowUp': move(0, -1, '↑'); break;
+                case 'ArrowDown': move(0, 1, '↓'); break;
+                case 'ArrowLeft': move(-1, 0, '←'); break;
+                case 'ArrowRight': move(1, 0, '→'); break;
+            }
+        });
+
+        const modalOverlay = document.getElementById('modalOverlay');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalContent = document.getElementById('modalContent');
+        let needsShuffleAfterModal = false;
+
+        function showModal(type) {
+            needsShuffleAfterModal = false;
+
+            if (type === 'hint') {
+                modalTitle.innerText = '💡 힌트';
+                modalContent.innerHTML = `현재 맵의 최단 시간은 <strong>${shortestPathData.length}초</strong> 입니다.<br>빙 돌아가지 말고 가장 빠른 길을 찾아보세요!`;
+            } else if (type === 'answer') {
+                modalTitle.innerText = '✅ 현재 맵의 정답';
+                modalContent.innerHTML = `
+                    <div style="text-align:left; background:#f5f5f5; padding:15px; border-radius:8px; margin-top:10px;">
+                        <strong>최단 이동 경로:</strong><br>
+                        <span style="color:var(--primary-color)">${shortestPathData.path.join(' ')}</span><br><br>
+                        <strong>최소 시간:</strong><br>
+                        <span style="color:var(--danger-color); font-weight:bold; font-size:1.2rem;">${shortestPathData.length}초</span>
+                    </div>
+                `;
+            } else if (type === 'success') {
+                modalTitle.innerText = '🎉 정답입니다! (+1점)';
+                modalContent.innerHTML = `최단 경로(${shortestPathData.length}초)로 잘 도착했습니다!<br>확인을 누르면 <strong>새로운 맵</strong>이 준비됩니다.`;
+                needsShuffleAfterModal = true;
+            } else if (type === 'wrong_path') {
+                modalTitle.innerText = '🤔 아쉬워요 (-1점)';
+                modalContent.innerHTML = `도착지에는 왔지만, 최단 경로가 아닙니다.<br>나의 기록: ${pathHistory.length}초<br>최단 기록: ${shortestPathData.length}초<br><br>확인을 누르면 <strong>새로운 맵</strong>으로 다시 도전합니다.`;
+                needsShuffleAfterModal = true;
+            } else if (type === 'wrong_dest') {
+                modalTitle.innerText = '❌ 오답입니다 (-1점)';
+                modalContent.innerHTML = `아직 도착지(🎯)에 도달하지 못했습니다.<br><br>확인을 누르면 <strong>새로운 맵</strong>으로 다시 도전합니다.`;
+                needsShuffleAfterModal = true;
+            }
+            
+            modalOverlay.style.display = 'flex';
+        }
+
+        function closeModalAndShuffle() {
+            modalOverlay.style.display = 'none';
+            if (needsShuffleAfterModal) {
+                shuffleAndRestart();
+            }
+        }
+
+        hardResetGame();
+    </script>
+</body>
+</html>
